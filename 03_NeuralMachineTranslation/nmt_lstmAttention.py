@@ -197,6 +197,6 @@ class Seq2Seq(nn.Module):
             outputs[t] = output
             teacher_force = random.random() < teacher_forcing_ratio
             top1 = output.max(1)[1]
-            input = (trg[t,:] if teacher_force else top1)
+            input = (trg[t] if teacher_force else top1)
         
         return outputs
