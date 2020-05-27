@@ -18,33 +18,34 @@ class Encoder(nn.Module):
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.hid_dim = hid_dim
-#         self.dropout = dropout
         
         self.embedding = nn.Embedding(
             num_embeddings=input_dim,
             embedding_dim=emb_dim
         )
-            # <YOUR CODE HERE>
         
-        simple_model = nn.Sequential()
-        simple_model.add_module('conv1', nn.Conv1d(
+        model = nn.Sequential()
+        model.add_module('conv1', nn.Conv1d(
             in_channels=emb_dim,
             out_channels=hid_dim,
             kernel_size=3
         ))
-        simple_model.add_module('relu1', nn.ReLU())
-        simple_model.add_module('conv2', nn.Conv1d(
+        model.add_module('bn1', nn.BatchNorm1d(hid_dim))
+        model.add_module('dropout1', nn.Dropout(p=dropout))
+        model.add_module('relu1', nn.ReLU())        
+        model.add_module('conv2', nn.Conv1d(
             in_channels=hid_dim,
             out_channels=hid_dim,
             kernel_size=4
         ))
-        simple_model.add_module('bn1', nn.BatchNorm1d(hid_dim))
-        simple_model.add_module('relu2', nn.ReLU())
-        #simple_model.add_module('adaptive_pool', nn.AdaptiveMaxPool1d(output_size=hid_dim))
-        simple_model.add_module('flatten', nn.Flatten())
-        simple_model.add_module('out', nn.Linear(hid_dim, hid_dim))
+        model.add_module('bn2', nn.BatchNorm1d(hid_dim))
+        model.add_module('dropout2', nn.Dropout(p=dropout))
+        model.add_module('relu2', nn.ReLU())
+        model.add_module('adaptive_pool', nn.AdaptiveMaxPool1d(output_size=hid_dim))
+        model.add_module('flatten', nn.Flatten())
+        model.add_module('out', nn.Linear(hid_dim, hid_dim))
         
-        self.cnn = simple_model
+        self.cnn = model
             # <YOUR CODE HERE>        
         self.dropout = nn.Dropout(p=dropout)# <YOUR CODE HERE>
         
