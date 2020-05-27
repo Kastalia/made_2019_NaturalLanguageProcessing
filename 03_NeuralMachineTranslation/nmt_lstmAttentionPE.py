@@ -1,4 +1,4 @@
-# Positional encoding realized by https://github.com/kaushalshetty
+# Positional encoding based on https://github.com/kaushalshetty
 
 import torch
 import torch.nn as nn
@@ -102,13 +102,15 @@ class PositionalEncoder(torch.nn.Module):
     Sets up embedding layer for word sequences as well as for word positions.Both the layers are trainable.
     Returns embeddings of words which also contains the position(time) component
     """
-    def __init__(self,vocab_size,emb_dim, max_len, batch_size):    
+    def __init__(self,vocab_size,emb_dim, max_len, batch_size, device):    
         
         """
         Args:
             vocab_size  : [int] vocabulary size
             emb_dim     : [int] embedding dimension for words
             max_len     : [int] maxlen of input sentence
+            batch_size  : [int] batch size
+            device      :  device where create position encode vector
  
         Returns:
             position encoded word embeddings
@@ -125,8 +127,8 @@ class PositionalEncoder(torch.nn.Module):
             padding_idx=0
         )
         
-        n_position = max_len+1
-        self.word_pos = Variable(torch.from_numpy(np.stack((np.arange(n_position) for i in range(batch_size)),axis=0)).type(torch.LongTensor))        
+        n_position = max_len+2
+        self.word_pos = Variable(torch.from_numpy(np.stack((np.arange(n_position) for i in range(batch_size)),axis=0)).type(torch.LongTensor)).to(device)        
         
         self.position_enc = torch.nn.Embedding(n_position, emb_dim, padding_idx=0)
         self.position_enc.weight.data = position_encoding_init(n_position, emb_dim)        
@@ -138,10 +140,11 @@ class PositionalEncoder(torch.nn.Module):
         #word_seq = [word_seq sent len, batch size]
         #word_embeddings = [src sent len, batch size, emb dim]
         #word_pos = [src sent len, batch size]    
-        word_embeddings = self.src_word_emb(word_seq)
+        word_embeddings = self.src_word_emb(word_seq)        
         
-        seq_len = word_seq.shape[0]     
-        word_pos_encoded = word_embeddings + self.position_enc(self.word_pos).permute(1,0,2)[0:seq_len]
+        seq_len = word_seq.shape[0]
+        batch_size_curr = word_seq.shape[1]
+        word_pos_encoded = word_embeddings + self.position_enc(self.word_pos).permute(1,0,2)[:seq_len,:batch_size_curr]
         
         return word_pos_encoded    
 
@@ -152,7 +155,7 @@ class PositionalEncoder(torch.nn.Module):
     
  
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, max_len, batch_size, hid_dim, n_layers, dropout):
+    def __init__(self, input_dim, emb_dim, max_len, batch_size, hid_dim, n_layers, dropout, device):
         super().__init__()        
         self.input_dim = input_dim
         self.emb_dim = emb_dim
@@ -163,7 +166,8 @@ class Encoder(nn.Module):
             vocab_size=input_dim,
             emb_dim = emb_dim,
             max_len = max_len,
-            batch_size=batch_size
+            batch_size=batch_size,
+            device = device
         )       
         self.rnn = nn.LSTM(
             input_size=emb_dim,
@@ -189,7 +193,7 @@ class Encoder(nn.Module):
     
 
 class Decoder(nn.Module):
-    def __init__(self, output_dim, emb_dim, max_len,batch_size, hid_dim, n_layers, dropout):
+    def __init__(self, output_dim, emb_dim, max_len,batch_size, hid_dim, n_layers, dropout, device):
         super().__init__()
 
         self.emb_dim = emb_dim
@@ -202,7 +206,8 @@ class Decoder(nn.Module):
             vocab_size=output_dim,
             emb_dim = emb_dim,
             max_len = max_len,
-            batch_size = batch_size
+            batch_size = batch_size,
+            device = device
         )   
         
         self.rnn = nn.LSTM(

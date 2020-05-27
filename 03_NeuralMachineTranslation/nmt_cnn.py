@@ -6,47 +6,37 @@ import torchtext
 from torchtext.datasets import TranslationDataset, Multi30k
 from torchtext.data import Field, BucketIterator
 
+import torchnlp
+
 import random
 import math
 import time
 
-
+ 
 class Encoder(nn.Module):
-    def __init__(self, input_dim, emb_dim, hid_dim, dropout):
+    def __init__(self, input_dim, emb_dim, hid_dim, n_layers, dropout):
         super().__init__()
         
         self.input_dim = input_dim
         self.emb_dim = emb_dim
         self.hid_dim = hid_dim
+        self.n_layers = n_layers
+#         self.dropout = dropout
         
         self.embedding = nn.Embedding(
             num_embeddings=input_dim,
             embedding_dim=emb_dim
         )
+            # <YOUR CODE HERE>
         
-        model = nn.Sequential()
-        model.add_module('conv1', nn.Conv1d(
-            in_channels=emb_dim,
-            out_channels=hid_dim,
-            kernel_size=3
-        ))
-        model.add_module('bn1', nn.BatchNorm1d(hid_dim))
-        model.add_module('dropout1', nn.Dropout(p=dropout))
-        model.add_module('relu1', nn.ReLU())        
-        model.add_module('conv2', nn.Conv1d(
-            in_channels=hid_dim,
-            out_channels=hid_dim,
-            kernel_size=4
-        ))
-        model.add_module('bn2', nn.BatchNorm1d(hid_dim))
-        model.add_module('dropout2', nn.Dropout(p=dropout))
-        model.add_module('relu2', nn.ReLU())
-        model.add_module('adaptive_pool', nn.AdaptiveMaxPool1d(output_size=hid_dim))
-        model.add_module('flatten', nn.Flatten())
-        model.add_module('out', nn.Linear(hid_dim, hid_dim))
+        self.rnn = nn.LSTM(
+            input_size=emb_dim,
+            hidden_size=hid_dim,
+            num_layers=n_layers,
+            dropout=dropout
+        )
+            # <YOUR CODE HERE>
         
-        self.cnn = model
-            # <YOUR CODE HERE>        
         self.dropout = nn.Dropout(p=dropout)# <YOUR CODE HERE>
         
     def forward(self, src):
@@ -58,7 +48,7 @@ class Encoder(nn.Module):
         
         embedded = self.dropout(embedded)
         
-        out = self.cnn(embedded)
+        output, (hidden, cell) = self.rnn(embedded)
         #embedded = [src sent len, batch size, emb dim]
         
         # Compute the RNN output values of the encoder RNN. 
@@ -72,7 +62,7 @@ class Encoder(nn.Module):
         
         #outputs are always from the top hidden layer
         
-        return out
+        return hidden, cell
     
 
 class Decoder(nn.Module):
@@ -159,7 +149,8 @@ class Seq2Seq(nn.Module):
         
         assert encoder.hid_dim == decoder.hid_dim, \
             "Hidden dimensions of encoder and decoder must be equal!"
-
+        assert encoder.n_layers == decoder.n_layers, \
+            "Encoder and decoder must have equal number of layers!"
         
     def forward(self, src, trg, teacher_forcing_ratio = 0.5):
         
@@ -177,8 +168,7 @@ class Seq2Seq(nn.Module):
         outputs = torch.zeros(max_len, batch_size, trg_vocab_size).to(self.device)
         
         #last hidden state of the encoder is used as the initial hidden state of the decoder
-        out = self.encoder(src)
-        hidden, cell = out
+        hidden, cell = self.encoder(src)
         
         #first input to the decoder is the <sos> tokens
         input = trg[0,:]
