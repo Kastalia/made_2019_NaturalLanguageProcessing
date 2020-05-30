@@ -1,4 +1,5 @@
 import torch.nn as nn
+import torch
 
 from nltk.translate.bleu_score import corpus_bleu
 import tqdm
