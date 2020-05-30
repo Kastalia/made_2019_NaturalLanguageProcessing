@@ -1,5 +1,8 @@
 import torch.nn as nn
 
+from nltk.translate.bleu_score import corpus_bleu
+import tqdm
+
 def flatten(l):
     return [item for sublist in l for item in sublist]
 
@@ -46,3 +49,35 @@ def epoch_time(start_time, end_time):
     elapsed_mins = int(elapsed_time / 60)
     elapsed_secs = int(elapsed_time - (elapsed_mins * 60))
     return elapsed_mins, elapsed_secs
+
+
+def bleu(model, test_iterator, TRG_vocabulary, nameModel="model"):
+    #     """ Estimates corpora-level BLEU score of model's translations given inp and reference out """
+    #     translations, _ = model.translate_lines(inp_lines, **flags)
+    #     # Note: if you experience out-of-memory error, split input lines into batches and translate separately
+    #     return corpus_bleu([[ref] for ref in out_lines], translations) * 100
+    #test translate
+    model.eval()
+    print("MODEL:{}\nEXAMPLE TRANSLATE:\n".format(nameModel))
+    batch = next(iter(test_iterator))
+    for idx in [1,2]:
+        src = batch.src[:, idx:idx+1]
+        trg = batch.trg[:, idx:idx+1]
+        print(generate_translation(src, trg, model, TRG_vocabulary))        
+    original_text = []
+    generated_text = []    
+    with torch.no_grad():
+        for i, batch in tqdm.tqdm(enumerate(test_iterator)):
+            src = batch.src
+            trg = batch.trg
+            output = model(src, trg, 0) #turn off teacher forcing
+            #trg = [trg sent len, batch size]
+            #output = [trg sent len, batch size, output dim]
+            output = output.argmax(dim=-1)
+
+            original_text.extend([get_text(x, TRG_vocabulary) for x in trg.cpu().numpy().T])
+            generated_text.extend([get_text(x, TRG_vocabulary) for x in output[1:].detach().cpu().numpy().T])
+
+    # original_text = flatten(original_text)
+    # generated_text = flatten(generated_text)
+    print(corpus_bleu([[text] for text in original_text], generated_text) * 100)
